@@ -191,7 +191,16 @@
 
         //hashed values of correct answers for basic validation
 
-        const answers = { "1-1": "j2_HOTsOQ0FX7vFu", "1-2": "zjtzZP5w9RdQw5-h", "1-3": "k4SrStCqt0tcuGLf", "2-1": "WHrBGPaFSfkxOjyz", "2-3": "ibdCU-1pZWtIDqpm", "3-1": "XKR7o5Ja9ID6jVcO", "3-2": "TyaA_hWng11WZQPv", "3-3": "k4SrStCqt0tcuGLf" };
+        const answers = { 
+        "1-1": "j2_HOTsOQ0FX7vFu",
+        "1-2": "zjtzZP5w9RdQw5-h",
+        "1-3": "k4SrStCqt0tcuGLf",
+        "2-1": "WHrBGPaFSfkxOjyz",
+        "2-3": "NeqUFMq8h9JQ5UVC",
+        "3-1": "ibdCU-1pZWtIDqpm",
+        "3-2": "XKR7o5Ja9ID6jVcO",
+        "3-3": "TyaA_hWng11WZQPv"
+        };
         let opened = []
         // Opens camera, scans a QR once, resolves with decoded text
         async function open_camera_and_scan_qr_code() {
@@ -285,7 +294,7 @@
                                     return;
                                 }
                                 opened.push(qrData);
-                                if (opened.length > 7) {
+                                if (opened.length > 6) {
                                     let answer_str = "";
                                     document.querySelectorAll('.hangman_part').forEach(el => {
                                         answer_str += el.textContent;
