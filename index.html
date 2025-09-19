@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Silly Little Game v1</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            color: #333;
+            text-align: center;
+        }
+
+        h1 {
+            color: #ff6347;
+        }
+
+        p {
+            font-size: 1.2em;
+        }
+
+        /* Grid as div-table */
+        .divTable {
+            display: table;
+            margin: 0 auto;
+            border: 1px solid #1C6EA4;
+            background: #EEE;
+            border-collapse: collapse;
+        }
+
+        .divTableRow {
+            display: table-row;
+        }
+
+        .divTableCell,
+        .img_holder {
+            display: table-cell;
+            width: 100px;
+            height: 100px;
+            border: 1px solid #AAA;
+            padding: 10px;
+            vertical-align: middle;
+        }
+
+        .divTableCell:hover {
+            cursor: pointer;
+            background: yellow;
+        }
+
+        img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* Scanner modal */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+        }
+
+        .box {
+            background: #111;
+            color: #fff;
+            padding: 12px;
+            border-radius: 12px;
+            width: min(92vw, 520px);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .box video {
+            width: 100%;
+            border-radius: 8px;
+            background: #000;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cancel {
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 0;
+            background: #e11d48;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .muted {
+            opacity: .8;
+            font-size: 12px;
+        }
+
+        img {
+            width: 100%;
+            height: auto;
+        }
+
+        #info_detail {
+            display: flex;
+            align-items: self-start;
+            margin: 0 auto;
+            justify-content: center;
+        }
+
+        #info_detail>div {
+            margin: 5px;
+        }
+
+        #question {
+            text-align: left;
+            max-width: 600px;
+            height: auto;
+            font-size: 1.1em;
+            border: solid #ccc 1px;
+            padding: 10px;
+            background: #fff;
+            color: #000;
+            border-radius: 8px;
+            box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #hangman_container {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-evenly;
+            margin: 0 auto;
+            width: 75%;
+            margin-bottom: 20px;
+        }
+
+        .hangman_part {
+            display: flex;
+            width: 50px;
+            font-size: 2.2em;
+            height: 40px;
+            border: solid 1px silver;
+            border-radius: 3px;
+            text-align: center;
+            align-content: baseline;
+            align-items: center;
+            justify-content: space-evenly;
+        }
+    </style>
+
+    <!-- QR decoding lib (keep only this include) -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
+    <script>
+
+
+
+
+
+        // 3x3 mapping to reveal images
+        const matrix = {
+            "1-1": `<img src='./1-1.png' alt='cell1_1'>`,
+            "1-2": `<img src='./1-2.png' alt='cell1_2'>`,
+            "1-3": `<img src='./1-3.png' alt='cell1_3'>`,
+            "2-1": `<img src='./2-1.png' alt='cell2_1'>`,
+            "2-2": `<img src='./2-2.png' alt='cell2_2'>`,
+            "2-3": `<img src='./2-3.png' alt='cell2_3'>`,
+            "3-1": `<img src='./3-1.png' alt='cell3_1'>`,
+            "3-2": `<img src='./3-2.png' alt='cell3_2'>`,
+            "3-3": `<img src='./3-3.png' alt='cell3_3'>`
+        };
+        const hangman = { "1-1": "П", "1-2": "А", "1-3": "Т", "2-1": "А", "2-3": "Т", "3-1": "Н", "3-2": "И", "3-3": "К" };
+        const questions = {
+            "1-1": "Аз съм стая, но не за спане. Пълна съм с хора, които говорят, спорят и решават. Какво съм?",
+            "1-2": "Не съм ресторант, но често пият кафе при мен. Под мен плуваш, над мен - почиваш",
+            "1-3": "При мен идват гладни, илизат сити",
+            "2-1": "Аз съм стая без легла и столове, но пълна с тежести. Тук картофът става мускул",
+            "2-2": "Мислиш, че знаеш каква е паролата? Въведи я тук, тя е само 8 символа!",
+            "2-3": "В мен топки се гонят по зелена поляна, стрелят се стрели по мишена, а екраните светят като малки вселени",
+            "3-1": "Не съм гора, но пазя дървета. Не съм камина, но без мен камината мълчи.",
+            "3-2": "Летя, но не съм птица. Назад и напред се люшкам, а най-щастливи са децата с мен",
+            "3-3": "Аз съм Google на хотела - всеки идва да ме пита нещо. Понякога давам ключ, понякога усмивка."
+        };
+
+        //hashed values of correct answers for basic validation
+
+        const answers = { "1-1": "j2_HOTsOQ0FX7vFu", "1-2": "zjtzZP5w9RdQw5-h", "1-3": "k4SrStCqt0tcuGLf", "2-1": "WHrBGPaFSfkxOjyz", "2-3": "ibdCU-1pZWtIDqpm", "3-1": "XKR7o5Ja9ID6jVcO", "3-2": "TyaA_hWng11WZQPv", "3-3": "k4SrStCqt0tcuGLf" };
+        let opened = []
+        // Opens camera, scans a QR once, resolves with decoded text
+        async function open_camera_and_scan_qr_code() {
+            if (!window.jsQR) throw new Error("jsQR not loaded");
+
+            // Build modal
+            const overlay = document.createElement('div'); overlay.className = 'overlay';
+            const box = document.createElement('div'); box.className = 'box';
+            const title = document.createElement('div'); title.textContent = "Point your camera at a QR code";
+            const video = document.createElement('video'); video.autoplay = true; video.playsInline = true;
+            const row = document.createElement('div'); row.className = 'row';
+            const info = document.createElement('div'); info.className = 'muted'; info.textContent = "Scanning…";
+            const cancelBtn = document.createElement('button'); cancelBtn.className = 'cancel'; cancelBtn.textContent = "Cancel";
+            row.append(info, cancelBtn); box.append(title, video, row); overlay.appendChild(box); document.body.appendChild(overlay);
+
+            // Camera
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            } catch (err) {
+                overlay.remove();
+                throw new Error("Camera error: " + err.message);
+            }
+            video.srcObject = stream;
+
+            // Scan loop
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            let rafId = null;
+
+            function cleanup() {
+                if (rafId) cancelAnimationFrame(rafId);
+                if (stream) stream.getTracks().forEach(t => t.stop());
+                overlay.remove();
+            }
+
+            return await new Promise((resolve, reject) => {
+                cancelBtn.onclick = () => { cleanup(); reject(new Error("User cancelled")); };
+
+                const loop = () => {
+                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        const w = video.videoWidth, h = video.videoHeight;
+                        if (w && h) {
+                            canvas.width = w; canvas.height = h;
+                            ctx.drawImage(video, 0, 0, w, h);
+                            const img = ctx.getImageData(0, 0, w, h);
+                            const code = jsQR(img.data, w, h, { inversionAttempts: "dontInvert" });
+                            if (code && code.data) {
+                                info.textContent = "QR detected!";
+                                cleanup();
+                                resolve(code.data);
+                                return;
+                            }
+                        }
+                    }
+                    rafId = requestAnimationFrame(loop);
+                };
+                rafId = requestAnimationFrame(loop);
+            });
+        }
+
+        // Hook up clicks
+        document.addEventListener('DOMContentLoaded', () => {
+            const cells = document.querySelectorAll('.divTableCell');
+            let scanning = false; // avoid multiple modals
+
+            cells.forEach(cell => {
+                cell.addEventListener('click', async () => {
+                    if (scanning) return;
+                    const key = cell.getAttribute('data-point');
+                    let question = questions[key] || "No question available.";
+                    let scanner_button = document.createElement('button');
+                    scanner_button.textContent = "Scan QR to reveal";
+                    scanner_button.id = "scanner_button";
+                    scanner_button.addEventListener('click', async () => {
+                        scanner_button.disabled = true;
+                        scanner_button.textContent = "Opening camera...";
+
+                        try {
+                            var qrData = await open_camera_and_scan_qr_code();
+                            console.log("QR result: " + qrData);
+                            //hash the qrData and compare with answers[key] here for validation if needed
+                            qrData = qrData.trim(); // simple normalization
+                            if (answers[key] === qrData) {
+                                console.log(matrix[key]);
+                                document.getElementById(key).innerHTML = hangman[key];
+                                cell.innerHTML = matrix[key];
+                                if (opened.indexOf(qrData) !== -1) {
+                                    alert("You have already opened this one. Try another cell.");
+
+                                    return;
+                                }
+                                opened.push(qrData);
+                                if (opened.length > 7) {
+                                    let answer_str = "";
+                                    document.querySelectorAll('.hangman_part').forEach(el => {
+                                        answer_str += el.textContent;
+                                    });
+
+                                    show_location(answer_str);
+
+                                }
+
+                            } else {
+                                alert("Incorrect answer. Try again.");
+                            }
+
+                        } catch (e) {
+                            console.log("Scan cancelled or failed: " + e.message);
+                        } finally {
+                            scanner_button.disabled = false;
+                            scanner_button.textContent = "Scan QR to reveal";
+                        }
+                    });
+                    document.getElementById('info_detail').innerHTML = "";
+                    ask_question_with_animation(question);
+                    //document.getElementById('info_detail').innerHTML = `<strong>${question}</strong><br/>`;
+                    if (document.getElementById('scanner_button')) {
+                        document.getElementById('scanner_button').remove();
+                    }
+                    if (key != "2-2") {
+                        document.getElementById('info_content').appendChild(scanner_button);
+                    } else {
+                        let coord_div = document.createElement('div');
+                        coord_div.innerHTML = "<p>Enter the 8-letter code you believe is correct:</p><input type='text' id='code_input' maxlength='8' style='font-size:1.2em; text-align:center;' /><br/>";
+                        document.getElementById('info_content').appendChild(coord_div);
+                        let submit_btn = document.createElement('button');
+                        submit_btn.textContent = "Submit Code";
+                        submit_btn.style.marginTop = "8px";
+                        submit_btn.addEventListener('click', () => {
+                            let user_code = document.getElementById('code_input').value.trim().toUpperCase();
+                            console.log(user_code, user_code.length, isNaN(user_code));
+                            if (user_code.length !== 8 || user_code.toUpperCase() != "ПАТАТНИК") {
+                                alert("Please enter a valid passcode.");
+                                return;
+                            }
+                            user_code = String(user_code)
+                            show_location(user_code)
+                        });
+                        document.getElementById('info_content').appendChild(submit_btn);
+                    }
+
+
+                });
+            });
+        });
+
+        function ask_question_with_animation(question) {
+            const infoDetail = document.getElementById('info_detail');
+            infoDetail.innerHTML = "<div class='img_holder'><img src='./question.png' alt='?' /></div><div id='question'></div>"; // reset
+            let questionDiv = document.getElementById('question');
+            questionDiv.innerHTML = ""; // clear previous
+            let index = 0;
+            const interval = setInterval(() => {
+                if (index < question.length) {
+                    questionDiv.innerHTML += question.charAt(index);
+                    index++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 10); // 10ms per character
+        }
+        function hashString(str) {
+            // Simple hash function (not secure, just for demo)
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const chr = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + chr;
+                hash |= 0; // Convert to 32bit integer
+            }
+            return hash.toString();
+        }
+
+
+        function show_location(user_code) {
+            const location = {
+    "ct": "rt6Uo68aTa2Icb+/RQ8xRQdZwk7YgBGrEw4F8ozRc25jFeHsY1EVS1FLmiFRsqE5sz4AnEPXSmkHGlNI07zU3STAj8dUIEOKtWsA/ajIFdOzB11mryp5nRdNVOhZ0BL+0eifFhuuBBpuJH/3vpn4PAVk6PIJpG7GRDQq2NLeDHsmqX5UoaZ793NmCSpOm1eLeVQNYlcesjaR/FsyO2OyYzjJ83HlIg6MNdifcSQCyh2fzdKhMPzMtnuLKcFyfGBHuoVWMemcWqiBB2ktOv5AD1dnYQ4wQjMy5FHwGnj8o10osCy+8CUaL49RT68vUzduPXwXIruZsOMQXc1jLFRNgP+EoVlsV5dB3LLGy/mATuRpdQI3XGo=",
+    "iv": "lizAN+JTRbGohl6J",
+    "salt": "iLXXS6MBHjL6cDF95GrYZg=="
+}
+            decryptToString(location, user_code).then(decrypted => {
+                console.log("Decrypted:", decrypted);
+                document.querySelector('.divTable').innerHTML = decrypted;
+                ask_question_with_animation("Congratulations! You've revealed the treasure location!");
+            }).catch(err => {
+                console.error("Decryption failed:", err);
+                alert("Incorrect code. Try again.");
+            });
+
+
+
+        }
+
+
+
+        /** --- Utilities --- **/
+        const enc = new TextEncoder();
+        const dec = new TextDecoder();
+
+        function b64encode(buf) {
+            return btoa(String.fromCharCode(...new Uint8Array(buf)));
+        }
+        function b64decode(b64) {
+            return Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+        }
+
+        /** Derive a CryptoKey from a passphrase + salt using PBKDF2 (SHA-256). */
+        async function deriveKey(passphrase, saltBytes) {
+            const baseKey = await crypto.subtle.importKey(
+                "raw",
+                enc.encode(passphrase),
+                "PBKDF2",
+                false,
+                ["deriveKey"]
+            );
+            return crypto.subtle.deriveKey(
+                { name: "PBKDF2", salt: saltBytes, iterations: 100_000, hash: "SHA-256" },
+                baseKey,
+                { name: "AES-GCM", length: 256 },
+                false,
+                ["encrypt", "decrypt"]
+            );
+        }
+
+        /** Encrypts a UTF-8 string with AES-GCM.
+         *  Returns a compact JSON object with base64 fields: { ct, iv, salt }
+         */
+        async function encryptString(plaintext, passphrase) {
+            const iv = crypto.getRandomValues(new Uint8Array(12));     // 96-bit IV for GCM
+            const salt = crypto.getRandomValues(new Uint8Array(16));   // 128-bit salt for PBKDF2
+            const key = await deriveKey(passphrase, salt);
+            const ciphertext = await crypto.subtle.encrypt(
+                { name: "AES-GCM", iv },
+                key,
+                enc.encode(plaintext)
+            );
+            return {
+                ct: b64encode(ciphertext),
+                iv: b64encode(iv),
+                salt: b64encode(salt)
+            };
+        }
+
+        /** Decrypts the object produced by encryptString back to a UTF-8 string. */
+        async function decryptToString(payload, passphrase) {
+            const iv = new Uint8Array(b64decode(payload.iv));
+            const salt = new Uint8Array(b64decode(payload.salt));
+            const key = await deriveKey(passphrase, salt);
+            const plainBuf = await crypto.subtle.decrypt(
+                { name: "AES-GCM", iv },
+                key,
+                b64decode(payload.ct)
+            );
+            return dec.decode(plainBuf);
+        }
+        (async () => {
+            const secret = `<!-- Replace LAT and LNG with decimal degrees -->
+<iframe
+  src="https://www.google.com/maps?q=42.269786,23.604222&z=15&output=embed"
+  width="600" height="450" style="border:0"
+  loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Map">
+</iframe>
+`;
+
+//q=42.269786,23.604222
+            const passphrase = "ПАТАТНИК";
+
+            const payload = await encryptString(secret, passphrase);
+            console.log("Encrypted:", payload); // { ct, iv, salt } as base64
+
+            const original = await decryptToString(payload, passphrase);
+        })();
+
+
+    </script>
+</head>
+
+<body>
+    <h1>Welcome to Silly Little Game v1</h1>
+    <p>Click a tile, scan a QR, and reveal the piece.</p>
+    <div id="hangman_container">
+        <div id="1-1" class="hangman_part"></div>
+        <div id="1-2" class="hangman_part"></div>
+        <div id="1-3" class="hangman_part"></div>
+        <div id="2-1" class="hangman_part"></div>
+        <div id="2-3" class="hangman_part"></div>
+        <div id="3-1" class="hangman_part"></div>
+        <div id="3-2" class="hangman_part"> </div>
+        <div id="3-3" class="hangman_part"></div>
+    </div>
+    <div class="divTable">
+        <div class="divTableRow">
+
+            <div class="divTableCell" data-point="1-1"><img src="./question.png" alt="?" /></div>
+            <div class="divTableCell" data-point="1-2"><img src="./question.png" alt="?" /></div>
+            <div class="divTableCell" data-point="1-3"><img src="./question.png" alt="?" /></div>
+        </div>
+        <div class="divTableRow">
+            <div class="divTableCell" data-point="2-1"><img src="./question.png" alt="?" /></div>
+            <div class="divTableCell" data-point="2-2"><img src="./treasure.png" alt="?" /></div>
+            <div class="divTableCell" data-point="2-3"><img src="./question.png" alt="?" /></div>
+        </div>
+        <div class="divTableRow">
+            <div class="divTableCell" data-point="3-1"><img src="./question.png" alt="?" /></div>
+            <div class="divTableCell" data-point="3-2"><img src="./question.png" alt="?" /></div>
+            <div class="divTableCell" data-point="3-3"><img src="./question.png" alt="?" /></div>
+        </div>
+    </div>
+
+    <div id="Info_container">
+        <p id="info_text">Click on a cell to reveal it after scanning a QR.</p>
+        <div id="info_content">
+            <p id="info_detail"></p>
+        </div>
+    </div>
+</body>
+
+</html>
